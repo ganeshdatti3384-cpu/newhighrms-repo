@@ -3,16 +3,16 @@ version: "2.4"
 services:
   server:
     image: docker.io/ganeshdatti3384/highrms-backend:latest
+    container_name: highrms-backend
     ports:
       - "8000:8000"
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/highrms
-      - DEBUG=False
-      - SECRET_KEY=change-this-in-production
-      - ALLOWED_HOSTS=localhost,127.0.0.1,3.110.106.88,hub.flyhii.in
-      - CSRF_TRUSTED_ORIGINS=http://localhost:8000,http://3.110.106.88:8000,https://hub.flyhii.in
-    command: ["/bin/bash", "/app/entrypoint.sh"]
+      DATABASE_URL: postgres://postgres:postgres@db:5432/highrms
+      DEBUG: "False"
+      SECRET_KEY: change-this-in-production
+      ALLOWED_HOSTS: localhost,127.0.0.1,3.110.106.88,hub.flyhii.in
+      CSRF_TRUSTED_ORIGINS: http://localhost:8000,http://3.110.106.88:8000,https://hub.flyhii.in
     volumes:
       - ./media:/app/media
       - ./staticfiles:/app/staticfiles
@@ -22,6 +22,7 @@ services:
 
   db:
     image: postgres:16-bullseye
+    container_name: highrms-db
     environment:
       POSTGRES_DB: highrms
       POSTGRES_USER: postgres
@@ -36,3 +37,44 @@ services:
 
 volumes:
   horilla-data:
+
+
+
+# version: "2.4"
+
+# services:
+#   server:
+#     image: docker.io/ganeshdatti3384/highrms-backend:latest
+#     ports:
+#       - "8000:8000"
+#     restart: unless-stopped
+#     environment:
+#       - DATABASE_URL=postgres://postgres:postgres@db:5432/highrms
+#       - DEBUG=False
+#       - SECRET_KEY=change-this-in-production
+#       - ALLOWED_HOSTS=localhost,127.0.0.1,3.110.106.88,hub.flyhii.in
+#       - CSRF_TRUSTED_ORIGINS=http://localhost:8000,http://3.110.106.88:8000,https://hub.flyhii.in
+#     command: ["/bin/bash", "/app/entrypoint.sh"]
+#     volumes:
+#       - ./media:/app/media
+#       - ./staticfiles:/app/staticfiles
+#     depends_on:
+#       db:
+#         condition: service_healthy
+
+#   db:
+#     image: postgres:16-bullseye
+#     environment:
+#       POSTGRES_DB: highrms
+#       POSTGRES_USER: postgres
+#       POSTGRES_PASSWORD: postgres
+#     volumes:
+#       - horilla-data:/var/lib/postgresql/data
+#     healthcheck:
+#       test: ["CMD", "pg_isready", "-U", "postgres"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+
+# volumes:
+#   horilla-data:
