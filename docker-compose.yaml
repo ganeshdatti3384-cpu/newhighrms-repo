@@ -1,35 +1,34 @@
-version: "2.4"
+version: "3.8"
 
 services:
   server:
-    image: docker.io/YOUR_DOCKERHUB_USERNAME/highrms-backend:${TAG}
+    image: docker.io/ganeshdatti76/highrms-backend:${TAG}
+    container_name: highrms-backend
     ports:
       - "8000:8000"
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/highrms
-      - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,43.205.232.40,hub.flyhii.in}
-      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost:8000,http://43.205.232.40:8000,https://hub.flyhii.in}
-    command: ["/bin/bash", "/app/entrypoint.sh"]
+      DATABASE_URL: postgres://postgres:postgres@db:5432/highrms
+      DEBUG: ${DEBUG:-False}
+      SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,43.205.232.40,hub.flyhii.in}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8000,http://43.205.232.40:8000,https://hub.flyhii.in}
     depends_on:
       db:
         condition: service_healthy
 
   db:
     image: postgres:16-bullseye
+    container_name: highrms-db
     environment:
       POSTGRES_DB: highrms
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
       PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
     volumes:
       - horilla-data:/var/lib/postgresql/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 10s
