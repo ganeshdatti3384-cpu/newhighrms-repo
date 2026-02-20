@@ -1,6 +1,5 @@
 name: HighRMS Backend CI/CD (OIDC)
 
-
 on:
   push:
     branches: [ main ]
@@ -13,8 +12,8 @@ env:
   IMAGE: highrms-backend
   REGISTRY_HOSTNAME: docker.io
   AWS_REGION: ap-south-1
-  INSTANCE_ID: i-079152808015fa1d3   # <-- Replace with your EC2 instance ID
-  AWS_ROLE_ARN: arn:aws:iam::074122282902:role/aws-oidc-role-2  # <-- Replace
+  INSTANCE_ID: i-079152808015fa1d3
+  AWS_ROLE_ARN: arn:aws:iam::074122282902:role/aws-oidc-role-2
 
 jobs:
 
@@ -22,22 +21,19 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      docker_tag: ${{ steps.meta.outputs.version }}
+      docker_tag: ${{ steps.tag.outputs.TAG }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 🔥 Create simple SHA tag manually (more reliable)
+      - name: Set Docker Tag
+        id: tag
+        run: echo "TAG=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY_HOSTNAME }}/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE }}
-          tags: |
-            type=sha
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -50,7 +46,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY_HOSTNAME }}/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE }}:${{ steps.tag.outputs.TAG }}
 
   deploy:
     needs: build-and-push
@@ -66,25 +62,29 @@ jobs:
 
       - name: Deploy HighRMS to EC2 via SSM
         run: |
-          aws ssm send-command \
+          COMMAND_ID=$(aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=instanceIds,Values=${{ env.INSTANCE_ID }}" \
-            --parameters 'commands=[
-              "cd /home/ubuntu/highrms",
+            --parameters "commands=[
+              \"cd /home/ubuntu/highrms\",
+              \"export TAG=${{ needs.build-and-push.outputs.docker_tag }}\",
+              \"docker login docker.io -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_PASSWORD }}\",
+              \"docker compose pull\",
+              \"docker compose up -d\",
+              \"docker image prune -af || true\"
+            ]" \
+            --query "Command.CommandId" \
+            --output text \
+            --region ${{ env.AWS_REGION }})
 
-              "export DOCKER_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}",
-              "export DOCKER_PASSWORD=${{ secrets.DOCKERHUB_PASSWORD }}",
-              "export TAG=${{ needs.build-and-push.outputs.docker_tag }}",
+          echo "Command ID: $COMMAND_ID"
 
-              "echo $DOCKER_PASSWORD | docker login docker.io -u $DOCKER_USERNAME --password-stdin || exit 1",
+          aws ssm wait command-executed \
+            --command-id $COMMAND_ID \
+            --instance-id ${{ env.INSTANCE_ID }} \
+            --region ${{ env.AWS_REGION }}
 
-              "sed -i \"s|image: .*highrms-backend:.*|image: docker.io/$DOCKER_USERNAME/highrms-backend:$TAG|\" docker-compose.yaml",
-
-              "docker-compose pull || exit 1",
-              "docker-compose down",
-              "docker-compose up -d",
-
-              "docker image prune -af || true"
-            ]' \
-            --comment "Deploying HighRMS Backend via GitHub OIDC" \
+          aws ssm get-command-invocation \
+            --command-id $COMMAND_ID \
+            --instance-id ${{ env.INSTANCE_ID }} \
             --region ${{ env.AWS_REGION }}
